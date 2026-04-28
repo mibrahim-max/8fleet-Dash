@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>8Fleet — Fleet Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; background: #fff; color: #1a1a1a; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+    .row-hover:hover { background: #f5f5f5 !important; cursor: pointer; }
+    .kpi-card { transition: box-shadow 0.18s; }
+    .kpi-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.08); }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .pulse { animation: pulse 2.2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .tab-btn { background: none; border: none; cursor: pointer; font-family: inherit; }
+    .tab-btn:hover { color: #0a0a0a !important; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div style="background:#0a0a0a;padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:56px;">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <span style="color:#fff;font-weight:700;font-size:20px;letter-spacing:-0.5px;">8Fleet</span>
+    <div style="width:1px;height:20px;background:#333;"></div>
+    <span style="color:#666;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;">Operations · SF Hub</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:20px;">
+    <div style="display:flex;align-items:center;gap:7px;font-size:11px;color:#666;">
+      <span class="pulse" style="display:inline-block;width:6px;height:6px;background:#1a8a4a;border-radius:50%;"></span>
+      Live
+    </div>
+    <span id="clock" style="color:#555;font-size:11px;"></span>
+  </div>
+</div>
+
+<!-- SUB-HEADER -->
+<div style="border-bottom:1px solid #e0e0e0;padding:20px 32px 0;background:#fff;">
+  <div style="max-width:1200px;margin:0 auto;">
+    <h1 style="font-size:22px;font-weight:700;color:#0a0a0a;letter-spacing:-0.5px;margin-bottom:16px;">Fleet Command Center</h1>
+    <div style="display:flex;gap:0;">
+      <button class="tab-btn" id="tab-drivers" onclick="switchTab('drivers')" style="padding:10px 20px;font-size:13px;font-weight:600;color:#0a0a0a;border-bottom:2px solid #0a0a0a;margin-bottom:-1px;transition:all 0.15s;">Drivers</button>
+      <button class="tab-btn" id="tab-fleet" onclick="switchTab('fleet')" style="padding:10px 20px;font-size:13px;font-weight:400;color:#999;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;">Fleet</button>
+      <button class="tab-btn" id="tab-schedule" onclick="switchTab('schedule')" style="padding:10px 20px;font-size:13px;font-weight:400;color:#999;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.15s;">Schedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div style="padding:24px 32px;max-width:1200px;margin:0 auto;">
+
+  <!-- KPI ROW -->
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px;" id="kpi-row"></div>
+
+  <!-- DRIVERS TAB -->
+  <div id="panel-drivers" class="fade-in">
+    <div style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;overflow:hidden;">
+      <div style="display:grid;grid-template-columns:1.6fr 1fr 0.8fr 1fr 1fr 1fr 1.1fr 1.4fr;padding:10px 20px;font-size:10px;font-weight:600;color:#999;border-bottom:1px solid #e0e0e0;background:#f5f5f5;letter-spacing:0.5px;text-transform:uppercase;">
+        <span>Driver</span><span>Status</span><span>Zone</span><span>Rides/Hr</span><span>Acceptance</span><span>Safety</span><span>Online Time</span><span>Flags</span>
+      </div>
+      <div id="driver-table-body"></div>
+    </div>
+    <div id="driver-detail" class="hidden" style="margin-top:12px;background:#fff;border:1px solid #c0c0c0;border-radius:6px;padding:20px 24px;"></div>
+  </div>
+
+  <!-- FLEET TAB -->
+  <div id="panel-fleet" class="hidden fade-in">
+    <div id="fleet-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;"></div>
+  </div>
+
+  <!-- SCHEDULE TAB -->
+  <div id="panel-schedule" class="hidden fade-in">
+    <div id="schedule-content" style="display:flex;flex-direction:column;gap:12px;"></div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div style="border-top:1px solid #e0e0e0;padding:14px 32px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;">
+  <span style="font-size:11px;color:#999;">© 2026 8Fleet, Inc. · The infrastructure to move the world.</span>
+  <span style="font-size:11px;color:#999;">Drafted by Mohamed Ibrahim · SF Hub · Ops Dashboard v1.0</span>
+</div>
+
+<script>
+const C = {
+  bg:"#ffffff", bgOff:"#f5f5f5", black:"#0a0a0a", text:"#1a1a1a",
+  textMid:"#666666", textLight:"#999999", border:"#e0e0e0", borderDark:"#c0c0c0",
+  green:"#1a8a4a", greenBg:"#edf7f1", amber:"#b85c00", amberBg:"#fff4e6",
+  red:"#c0392b", redBg:"#fdf0ee", blue:"#1a4fa0", blueBg:"#eef3fc",
+};
+
+const statusMeta = {
+  "Online":          { color:C.green, bg:C.greenBg, dot:"#1a8a4a" },
+  "On Ride":         { color:C.blue,  bg:C.blueBg,  dot:"#1a4fa0" },
+  "On Break":        { color:C.amber, bg:C.amberBg, dot:"#b85c00" },
+  "Offline":         { color:C.textLight, bg:C.bgOff, dot:"#bbb" },
+  "In Service":      { color:C.green, bg:C.greenBg, dot:"#1a8a4a" },
+  "Available":       { color:C.blue,  bg:C.blueBg,  dot:"#1a4fa0" },
+  "Maintenance Due": { color:C.red,   bg:C.redBg,   dot:"#c0392b" },
+};
+
+const drivers = [
+  { id:1, name:"Marcus T.",  status:"Online",   shift:"6AM–2PM",  ridesCompleted:14, ridesPerHour:3.9, acceptanceRate:94, onlineTime:3.6, safetyScore:98, vehicle:"VH-104", zone:"SoMa" },
+  { id:2, name:"Priya N.",   status:"On Ride",  shift:"6AM–2PM",  ridesCompleted:17, ridesPerHour:4.3, acceptanceRate:88, onlineTime:4.0, safetyScore:95, vehicle:"VH-107", zone:"Mission" },
+  { id:3, name:"Devon W.",   status:"Online",   shift:"2PM–10PM", ridesCompleted:6,  ridesPerHour:3.0, acceptanceRate:71, onlineTime:2.0, safetyScore:82, vehicle:"VH-112", zone:"Tenderloin" },
+  { id:4, name:"Aaliyah J.", status:"On Break", shift:"6AM–2PM",  ridesCompleted:11, ridesPerHour:3.7, acceptanceRate:96, onlineTime:3.0, safetyScore:99, vehicle:"VH-103", zone:"SoMa" },
+  { id:5, name:"Tomas R.",   status:"Offline",  shift:"2PM–10PM", ridesCompleted:0,  ridesPerHour:0,   acceptanceRate:79, onlineTime:0,   safetyScore:87, vehicle:"VH-119", zone:"—" },
+  { id:6, name:"Keisha B.",  status:"On Ride",  shift:"6AM–2PM",  ridesCompleted:19, ridesPerHour:4.8, acceptanceRate:97, onlineTime:4.0, safetyScore:97, vehicle:"VH-101", zone:"FiDi" },
+  { id:7, name:"Jin P.",     status:"Online",   shift:"10PM–6AM", ridesCompleted:3,  ridesPerHour:2.1, acceptanceRate:65, onlineTime:1.4, safetyScore:78, vehicle:"VH-122", zone:"Castro" },
+  { id:8, name:"Simone A.",  status:"Online",   shift:"6AM–2PM",  ridesCompleted:13, ridesPerHour:3.8, acceptanceRate:91, onlineTime:3.4, safetyScore:93, vehicle:"VH-108", zone:"Haight" },
+];
+
+const vehicles = [
+  { id:"VH-101", model:"Tesla Model Y",       mileage:42800, status:"In Service",      lastInspection:"Apr 18", fuelLevel:87, nextMaintenance:"May 12" },
+  { id:"VH-103", model:"Tesla Model 3",       mileage:61200, status:"In Service",      lastInspection:"Apr 20", fuelLevel:61, nextMaintenance:"Apr 30" },
+  { id:"VH-104", model:"Toyota Camry Hybrid", mileage:38500, status:"In Service",      lastInspection:"Apr 15", fuelLevel:74, nextMaintenance:"May 20" },
+  { id:"VH-107", model:"Tesla Model Y",       mileage:29100, status:"In Service",      lastInspection:"Apr 22", fuelLevel:55, nextMaintenance:"Jun 01" },
+  { id:"VH-108", model:"Honda Accord Hybrid", mileage:51000, status:"In Service",      lastInspection:"Apr 10", fuelLevel:90, nextMaintenance:"May 05" },
+  { id:"VH-112", model:"Toyota Camry Hybrid", mileage:73400, status:"Maintenance Due", lastInspection:"Mar 28", fuelLevel:42, nextMaintenance:"Apr 25" },
+  { id:"VH-119", model:"Tesla Model 3",       mileage:18200, status:"Available",       lastInspection:"Apr 21", fuelLevel:95, nextMaintenance:"Jul 15" },
+  { id:"VH-122", model:"Honda Accord Hybrid", mileage:44600, status:"In Service",      lastInspection:"Apr 17", fuelLevel:68, nextMaintenance:"May 28" },
+];
+
+const schedule = [
+  { shift:"6AM – 2PM",  drivers:["Marcus T.","Priya N.","Aaliyah J.","Keisha B.","Simone A."], coverage:5 },
+  { shift:"2PM – 10PM", drivers:["Devon W.","Tomas R."], coverage:2 },
+  { shift:"10PM – 6AM", drivers:["Jin P."], coverage:1 },
+];
+
+let selectedDriverId = null;
+
+function flagDriver(d) {
+  const flags = [];
+  if (d.acceptanceRate < 75) flags.push({ label:"Low Acceptance", color:C.red, bg:C.redBg });
+  if (d.safetyScore < 85)    flags.push({ label:"Safety Review",  color:C.amber, bg:C.amberBg });
+  if (d.onlineTime < 2.5 && d.status !== "Offline") flags.push({ label:"Low Online Time", color:C.amber, bg:C.amberBg });
+  return flags;
+}
+
+function bar(value, max, color) {
+  const pct = Math.min((value / max) * 100, 100);
+  return `<div style="background:#f5f5f5;border-radius:2px;height:4px;width:100%;overflow:hidden;">
+    <div style="width:${pct}%;background:${color};height:100%;border-radius:2px;transition:width 0.6s ease;"></div>
+  </div>`;
+}
+
+function badge(status) {
+  const m = statusMeta[status] || { color:C.textLight, bg:C.bgOff };
+  return `<span style="font-size:10px;color:${m.color};background:${m.bg};padding:3px 9px;border-radius:3px;font-weight:500;white-space:nowrap;">${status}</span>`;
+}
+
+function metricColor(val, high, mid) {
+  return val >= high ? C.green : val >= mid ? C.amber : C.red;
+}
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    'Fri Apr 24, 2026 · ' + now.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+}
+updateClock();
+setInterval(updateClock, 10000);
+
+// KPIs
+function renderKPIs() {
+  const totalOnline = drivers.filter(d => d.status !== "Offline").length;
+  const avgAcceptance = Math.round(drivers.reduce((s,d) => s+d.acceptanceRate,0)/drivers.length);
+  const avgSafety = Math.round(drivers.reduce((s,d) => s+d.safetyScore,0)/drivers.length);
+  const totalRides = drivers.reduce((s,d) => s+d.ridesCompleted,0);
+  const mDue = vehicles.filter(v => v.status==="Maintenance Due").length;
+
+  const kpis = [
+    { label:"Active Drivers",      value:`${totalOnline}/8`, sub:"currently online",   vc:C.black },
+    { label:"Rides Today",         value:totalRides,          sub:"completed this shift", vc:C.black },
+    { label:"Avg Acceptance",      value:`${avgAcceptance}%`, sub:"fleet average",     vc:avgAcceptance>=85?C.green:C.amber },
+    { label:"Avg Safety Score",    value:avgSafety,           sub:"out of 100",        vc:avgSafety>=90?C.green:C.amber },
+    { label:"Maintenance Alerts",  value:mDue,                sub:"vehicles due",      vc:mDue>0?C.red:C.green },
+  ];
+
+  document.getElementById('kpi-row').innerHTML = kpis.map(k => `
+    <div class="kpi-card" style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:16px 20px;">
+      <div style="font-size:11px;color:#999;font-weight:500;margin-bottom:8px;letter-spacing:0.2px;">${k.label}</div>
+      <div style="font-size:30px;font-weight:700;color:${k.vc};line-height:1;letter-spacing:-1px;">${k.value}</div>
+      <div style="font-size:11px;color:#999;margin-top:6px;">${k.sub}</div>
+    </div>
+  `).join('');
+}
+
+// Driver Table
+function renderDrivers() {
+  const body = document.getElementById('driver-table-body');
+  body.innerHTML = drivers.map((d, i) => {
+    const flags = flagDriver(d);
+    const isLast = i === drivers.length - 1;
+    const rphColor = metricColor(d.ridesPerHour, 4, 3);
+    const accColor = metricColor(d.acceptanceRate, 85, 75);
+    const safColor = metricColor(d.safetyScore, 90, 80);
+    const ontColor = metricColor(d.onlineTime, 3.5, 2.5);
+    const flagsHtml = flags.length === 0
+      ? `<span style="font-size:11px;color:#999;">—</span>`
+      : flags.map(f => `<span style="font-size:10px;color:${f.color};background:${f.bg};padding:2px 8px;border-radius:3px;font-weight:500;margin-right:3px;">${f.label}</span>`).join('');
+    const selected = selectedDriverId === d.id;
+    return `
+      <div class="row-hover" onclick="selectDriver(${d.id})"
+        style="display:grid;grid-template-columns:1.6fr 1fr 0.8fr 1fr 1fr 1fr 1.1fr 1.4fr;padding:13px 20px;
+          border-bottom:${isLast?'none':'1px solid #e0e0e0'};
+          background:${selected?'#f5f5f5':'#fff'};align-items:center;transition:background 0.1s;">
+        <span style="font-size:13px;font-weight:500;color:#0a0a0a;">${d.name}</span>
+        <span>${badge(d.status)}</span>
+        <span style="font-size:12px;color:#666;">${d.zone}</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:${rphColor};margin-bottom:5px;">${d.ridesPerHour}</div>
+          ${bar(d.ridesPerHour,6,rphColor)}
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:${accColor};margin-bottom:5px;">${d.acceptanceRate}%</div>
+          ${bar(d.acceptanceRate,100,accColor)}
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:${safColor};margin-bottom:5px;">${d.safetyScore}</div>
+          ${bar(d.safetyScore,100,safColor)}
+        </div>
+        <div>
+          <div style="font-size:12px;color:#666;margin-bottom:5px;">${d.onlineTime}h / 4h</div>
+          ${bar(d.onlineTime,4,ontColor)}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">${flagsHtml}</div>
+      </div>`;
+  }).join('');
+}
+
+function selectDriver(id) {
+  if (selectedDriverId === id) {
+    selectedDriverId = null;
+  } else {
+    selectedDriverId = id;
+  }
+  renderDrivers();
+  renderDriverDetail();
+}
+
+function renderDriverDetail() {
+  const panel = document.getElementById('driver-detail');
+  if (!selectedDriverId) { panel.classList.add('hidden'); return; }
+  const d = drivers.find(x => x.id === selectedDriverId);
+  if (!d) { panel.classList.add('hidden'); return; }
+  const flags = flagDriver(d);
+  const actionHtml = flags.length > 0 ? `
+    <div style="margin-top:12px;padding:14px 16px;background:${C.redBg};border-radius:6px;border-left:3px solid ${C.red};">
+      <div style="font-size:11px;font-weight:600;color:${C.red};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Action Required</div>
+      ${flags.map(f => `<div style="font-size:12px;color:#1a1a1a;margin-top:4px;">→ <strong>${f.label}:</strong> Schedule coaching conversation and review recent trip data.</div>`).join('')}
+    </div>` : '';
+
+  panel.classList.remove('hidden');
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#0a0a0a;">${d.name}</div>
+        <div style="font-size:12px;color:#666;margin-top:3px;">Vehicle ${d.vehicle} · Shift ${d.shift}</div>
+      </div>
+      <button onclick="selectDriver(${d.id})" style="background:none;border:1px solid #e0e0e0;color:#999;cursor:pointer;font-size:16px;width:30px;height:30px;border-radius:4px;">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+      ${[
+        { label:"Rides Completed", value:d.ridesCompleted },
+        { label:"Rides / Hour",    value:d.ridesPerHour },
+        { label:"Acceptance Rate", value:`${d.acceptanceRate}%` },
+        { label:"Safety Score",    value:d.safetyScore },
+      ].map(m => `
+        <div style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;">
+          <div style="font-size:10px;color:#999;font-weight:500;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">${m.label}</div>
+          <div style="font-size:24px;font-weight:700;color:#0a0a0a;">${m.value}</div>
+        </div>`).join('')}
+    </div>
+    ${actionHtml}
+  `;
+}
+
+// Fleet
+function renderFleet() {
+  document.getElementById('fleet-grid').innerHTML = vehicles.map(v => {
+    const m = statusMeta[v.status] || { color:C.textLight, bg:C.bgOff };
+    const fuelColor = v.fuelLevel < 50 ? C.amber : C.green;
+    return `
+      <div style="background:#fff;border:1px solid ${v.status==='Maintenance Due'?C.red:'#e0e0e0'};border-radius:6px;padding:16px 18px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#0a0a0a;">${v.id}</div>
+            <div style="font-size:11px;color:#666;margin-top:2px;">${v.model}</div>
+          </div>
+          ${badge(v.status)}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-bottom:12px;">
+          <span style="color:#999;">Mileage</span>
+          <span style="color:#1a1a1a;text-align:right;font-weight:500;">${v.mileage.toLocaleString()} mi</span>
+          <span style="color:#999;">Last Inspect.</span>
+          <span style="color:#1a1a1a;text-align:right;font-weight:500;">${v.lastInspection}</span>
+          <span style="color:#999;">Next Maint.</span>
+          <span style="color:${v.status==='Maintenance Due'?C.red:'#1a1a1a'};text-align:right;font-weight:500;">${v.nextMaintenance}</span>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px;">
+            <span style="color:#999;">Fuel Level</span>
+            <span style="color:${fuelColor};font-weight:500;">${v.fuelLevel}%</span>
+          </div>
+          ${bar(v.fuelLevel,100,fuelColor)}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Schedule
+function renderSchedule() {
+  const shiftHtml = schedule.map(s => {
+    const sc = s.coverage>=4?{color:C.green,bg:C.greenBg,label:"Well Staffed"}
+              :s.coverage>=2?{color:C.amber,bg:C.amberBg,label:"Adequate"}
+              :{color:C.red,bg:C.redBg,label:"Understaffed"};
+    const driverChips = s.drivers.map(name => {
+      const d = drivers.find(x => x.name===name);
+      const dot = d ? (statusMeta[d.status]?.dot||"#bbb") : "#bbb";
+      return `<div style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:7px 12px;display:inline-flex;align-items:center;gap:7px;margin:3px;">
+        <span class="pulse" style="width:6px;height:6px;background:${dot};border-radius:50%;display:inline-block;flex-shrink:0;"></span>
+        <span style="font-size:12px;font-weight:500;color:#1a1a1a;">${name}</span>
+        <span style="font-size:10px;color:#999;">${d?.vehicle||''}</span>
+      </div>`;
+    }).join('');
+    return `
+      <div style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:18px 22px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#0a0a0a;">${s.shift}</div>
+            <div style="font-size:11px;color:#999;margin-top:2px;">${s.coverage} driver${s.coverage!==1?'s':''} assigned</div>
+          </div>
+          <span style="font-size:11px;font-weight:500;padding:4px 12px;border-radius:3px;color:${sc.color};background:${sc.bg};">${sc.label}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:0;">${driverChips}</div>
+      </div>`;
+  }).join('');
+
+  const timecardHtml = drivers.map(d => {
+    const ontColor = d.onlineTime>=3.5?C.green:d.onlineTime>=2.5?C.amber:C.red;
+    return `
+      <div style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:4px;padding:10px 14px;">
+        <div style="font-size:12px;font-weight:500;color:#1a1a1a;margin-bottom:2px;">${d.name}</div>
+        <div style="font-size:10px;color:#999;margin-bottom:8px;">${d.shift}</div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px;">
+          <span style="color:#999;">Online</span>
+          <span style="font-weight:600;color:${ontColor};">${d.onlineTime}h</span>
+        </div>
+        ${bar(d.onlineTime,4,ontColor)}
+      </div>`;
+  }).join('');
+
+  document.getElementById('schedule-content').innerHTML = shiftHtml + `
+    <div style="background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:18px 22px;">
+      <div style="font-size:14px;font-weight:700;color:#0a0a0a;margin-bottom:14px;">Timecard Overview</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">${timecardHtml}</div>
+    </div>`;
+}
+
+// Tab switching
+function switchTab(tab) {
+  ['drivers','fleet','schedule'].forEach(t => {
+    document.getElementById('panel-'+t).classList.toggle('hidden', t!==tab);
+    const btn = document.getElementById('tab-'+t);
+    btn.style.fontWeight = t===tab ? '600' : '400';
+    btn.style.color = t===tab ? '#0a0a0a' : '#999';
+    btn.style.borderBottom = t===tab ? '2px solid #0a0a0a' : '2px solid transparent';
+  });
+}
+
+// Init
+renderKPIs();
+renderDrivers();
+renderDriverDetail();
+renderFleet();
+renderSchedule();
+</script>
+</body>
+</html>
